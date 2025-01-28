@@ -53,6 +53,29 @@ app.get("/coupon", async (req, res) => {
 });
 
 
+// Endpoint to serve the thumbnail for a coupon image
+app.get("/coup/thumb/:couponCode", async (req, res) => {
+  const couponCode = req.params.couponCode;
+  const imagePath = path.join(imagesDir, `${couponCode}.png`);
+  const defaultImagePath = path.join(imagesDir, '404coupon.png'); // Default image path
+
+  // Check if the coupon image exists
+  if (!fs.existsSync(imagePath)) {
+    console.log('Coupon image not found, serving default 404coupon.png...');
+
+    // Check if the 404coupon.png exists
+    if (!fs.existsSync(defaultImagePath)) {
+      return res.status(404).send('404coupon.png not found.');
+    }
+
+    // Serve the default 404coupon.png image
+    return res.sendFile(defaultImagePath);
+  }
+
+  // If the coupon image exists, serve it
+  return res.sendFile(imagePath);
+});
+
 async function generateCouponImage(couponCode) {
   const width = 800;
   const height = 600;
