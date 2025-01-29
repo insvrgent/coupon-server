@@ -1,19 +1,19 @@
 const http = require("http");
 const express = require('express');
 
-const { createCanvas } = require('canvas');
+const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 
-const port = 6667;
+const port = 7778;
 const imagesDir = path.join(__dirname, "uploads/coupon"); // Tempat untuk menyimpan gambar
 
-// CORS configuration to allow only dev.api.kedaimaster.com
+// CORS configuration to allow only api.kedaimaster.com
 const corsOptions = {
-  origin: 'https://dev.api.kedaimaster.com', // Allow only this origin
+  origin: 'https://api.kedaimaster.com', // Allow only this origin
   methods: ['GET', 'POST', 'DELETE'], // Allow only these methods (CRUD operations)
   allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers if any
 };
@@ -21,17 +21,17 @@ const corsOptions = {
 app.use(cors(corsOptions)); // Enable CORS with the defined options
 
 app.get("/coupon", async (req, res) => {
-    const couponCode = req.query.couponCode;
-    if (!couponCode) {
-        return res.status(400).send("Coupon code is required");
-    }
+  const couponCode = req.query.couponCode;
+  if (!couponCode) {
+    return res.status(400).send("Coupon code is required");
+  }
 
-    // URL untuk gambar OG Image
-    const ogImageUrl = `https://dev.coupon.kedaimaster.com/coup/thumb/${couponCode}`;
-    const redirectTo = `https://dev.kedaimaster.com/?modal=claim-coupon&couponCode=${couponCode}`;
+  // URL untuk gambar OG Image
+  const ogImageUrl = `https://coupon.kedaimaster.com/coup/thumb/${couponCode}`;
+  const redirectTo = `https://kedaimaster.com/?modal=claim-coupon&couponCode=${couponCode}`;
 
-    // Render HTML yang berbeda sesuai dengan couponCode
-    res.send(`
+  // Render HTML yang berbeda sesuai dengan couponCode
+  res.send(`
       <html>
         <head>
           <title>Kupon - ${couponCode}</title>
@@ -39,7 +39,7 @@ app.get("/coupon", async (req, res) => {
           <meta property="og:title" content="Kupon - ${couponCode}" />
           <meta property="og:description" content="Jangan ragukan pelanggan, klaim untuk berlangganan dan nikmati fitur spesial!" />
           <meta property="og:image" content="${ogImageUrl}" />
-          <meta property="og:url" content="https://dev.coupon.kedaimaster.com/coup/thumb/?couponCode=${couponCode}" />
+          <meta property="og:url" content="https://coupon.kedaimaster.com/coup/thumb/?couponCode=${couponCode}" />
           <meta name="twitter:card" content="summary_large_image" />
           <meta name="twitter:image" content="${ogImageUrl}" />
           <!-- Redirect Meta Tag -->
@@ -76,69 +76,115 @@ app.get("/coup/thumb/:couponCode", async (req, res) => {
   return res.sendFile(imagePath);
 });
 
-async function generateCouponImage(couponCode) {
-  const width = 800;
-  const height = 600;
+const formatExpirationDate = (dateString) => {
+  const date = new Date(dateString);
 
-  // Create a canvas with the specified width and height
-  const canvas = createCanvas(width, height);
+  // Options for Indonesian date format
+  const options = {
+    weekday: 'long', // 'Monday'
+    year: 'numeric', // '2025'
+    month: 'long', // 'Januari'
+    day: 'numeric' // '11'
+  };
+
+  // Format the date to Indonesian locale (ID)
+  return date.toLocaleDateString('id-ID', options);
+};
+
+// Function to calculate the difference in days between expiration and current date (adjusted to UTC)
+const calculateDaysLeft = (expirationDate) => {
+  const currentDate = new Date();
+  const expiration = new Date(expirationDate);
+
+  // Convert both dates to UTC
+  const utcCurrentDate = new Date(currentDate.toISOString()); // Ensure it's in UTC
+  const utcExpirationDate = new Date(expiration.toISOString()); // Ensure it's in UTC
+
+  // Calculate the time difference in milliseconds
+  const timeDifference = utcExpirationDate - utcCurrentDate;
+  const daysLeft = Math.ceil(timeDifference / (1000 * 3600 * 24)); // Convert to days
+
+  return daysLeft;
+};
+
+async function generateCouponImage(couponCode, discountType, discountValue, expirationDate, discountPeriods, imagePath) {
+
+  const formattedValue = discountType == 'fixed' ? `Diskon Rp${discountValue}` : discountValue != 0 ? `Diskon ${discountValue}%` : 'kupon berlangganan';
+
+  const period = discountValue === 0 ? `Masa berlangganan ${discountPeriods} minggu` : `Masa kupon ${discountPeriods} minggu`;
+
+  const daysLeft = expirationDate != 'undefined' ? calculateDaysLeft(expirationDate) : null;
+
+  const expiration = expirationDate == 'undefined' ? 'Tanpa kadaluarsa' :
+    daysLeft <= 7
+      ? `Berlaku hingga ${daysLeft} hari lagi`
+      : `Berlaku hingga: ${formatExpirationDate(expirationDate)}`
+
+
+  const canvas = createCanvas(385, 222); // Adjust canvas size as necessary
   const ctx = canvas.getContext('2d');
 
-  // Set a background color for the image
-  ctx.fillStyle = '#ffcc00'; // Yellow background
-  ctx.fillRect(0, 0, width, height);
+  // Load a background image (if applicable)
+  const backgroundImage = await loadImage('./uploads/coupon/bg.png'); // Replace with the actual image path
 
-  // Set the font style
-  ctx.fillStyle = '#000000'; // Black text color
-  ctx.font = 'bold 48px Arial';
+  // Draw background image onto the canvas
+  ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
 
-  // Write the coupon code on the image
-  const text = `Kupon Kode: ${couponCode}`;
-  ctx.fillText(text, 100, 150);
+  // Add text
+  ctx.fillStyle = 'black'; // Set text color
+  ctx.font = 'bold 14px Arial'; // Set font style and size
+  ctx.fillText(formattedValue, 143, 85);
+  ctx.font = '13px Arial';
+  ctx.fillText(period, 143, 122);
+  ctx.fillText(expiration, 143, 156);
 
-  // Add some description
-  ctx.font = '24px Arial';
-  ctx.fillText('Gunakan kode ini untuk diskon spesial!', 100, 250);
+  // Rotate and add text vertically
+  ctx.font = 'bold 18px Arial';
+  ctx.fillStyle = '#333';  // Text color
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.translate(90, canvas.height / 2); // Move to the center of the left column
+  ctx.rotate(Math.PI / 2);  // Rotate the canvas to make the text vertical
+  ctx.fillText(couponCode, 0, 0); // Draw the text vertically
 
-  // Define the image path
-  const imagePath = path.join(imagesDir, `${couponCode}.png`);
-
-  // Save the image to a file
+  // Save the coupon image
   const buffer = canvas.toBuffer('image/png');
   fs.writeFileSync(imagePath, buffer);
 
-  console.log(`Coupon image saved at: ${imagePath}`);
+  console.log(`Coupon design saved at: ${imagePath}`);
 }
 
 // Endpoint for generating coupon image
 app.post("/coupon", async (req, res) => {
-  const couponCode = req.query.couponCode;
+  const { couponCode, discountType, discountValue, expirationDate, discountPeriods } = req.query;
+  console.log(req.query)
   const imagePath = path.join(imagesDir, `${couponCode}.png`);
 
   // Check if the image already exists
   if (!fs.existsSync(imagePath)) {
     console.log('Generating coupon image...');
-    await generateCouponImage(couponCode);
+    await generateCouponImage(couponCode != undefined ? couponCode : null, discountType != undefined ? discountType : null, discountValue != undefined ? discountValue : null, expirationDate != undefined ? expirationDate : null, discountPeriods != undefined ? discountPeriods : null, imagePath);
   }
 
   // If the image exists, serve it
   return res.sendFile(imagePath);
 });
 
+
 // Endpoint untuk klaim kupon, yang akan menghapus gambar kupon terkait
 app.delete('/coupon', (req, res) => {
-    const couponCode = req.query.couponCode;
-    const imagePath = path.join(imagesDir, `${couponCode}.png`);
+  const couponCode = req.query.couponCode;
+  const imagePath = path.join(imagesDir, `${couponCode}.png`);
 
-    // Cek apakah gambar ada dan hapus jika ada
-    if (fs.existsSync(imagePath)) {
-      fs.unlinkSync(imagePath); // Hapus gambar
-      return res.status(200).send('Kupon berhasil diklaim dan gambar dihapus');
-    }
+  // Cek apakah gambar ada dan hapus jika ada
+  if (fs.existsSync(imagePath)) {
+    fs.unlinkSync(imagePath); // Hapus gambar
+    return res.status(200).send('Kupon berhasil diklaim dan gambar dihapus');
+  }
 
-    return res.status(404).send('Kupon tidak ditemukan atau sudah dihapus');
+  return res.status(404).send('Kupon tidak ditemukan atau sudah dihapus');
 });
 
 server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
+  console.log(`Server running on http://localhost:${port}`);
 });
