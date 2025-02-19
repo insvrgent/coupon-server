@@ -1,5 +1,6 @@
 const http = require("http");
 const express = require('express');
+const CryptoJS = require('crypto-js');
 
 const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
@@ -8,12 +9,12 @@ const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 
-const port = 7778;
+const port = 6667;
 const imagesDir = path.join(__dirname, "uploads/coupon"); // Tempat untuk menyimpan gambar
 
 // CORS configuration to allow only api.kedaimaster.com
 const corsOptions = {
-  origin: 'https://api.kedaimaster.com', // Allow only this origin
+  origin: 'https://dev.api.kedaimaster.com', // Allow only this origin
   methods: ['GET', 'POST', 'DELETE'], // Allow only these methods (CRUD operations)
   allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers if any
 };
@@ -21,25 +22,34 @@ const corsOptions = {
 app.use(cors(corsOptions)); // Enable CORS with the defined options
 
 app.get("/coupon", async (req, res) => {
-  const couponCode = req.query.couponCode;
+    const couponCode = req.query.c;
   if (!couponCode) {
     return res.status(400).send("Coupon code is required");
   }
 
+    console.log(couponCode)
+    // Your AES-256 key (ensure this is kept secret and secure!)
+    const secretKey = 'xixixi666'; // 32 characters for AES-256
+
+    // Decrypt the couponCode
+    const decryptedBytes = CryptoJS.AES.decrypt(couponCode, secretKey);
+    const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
+
+    console.log(decryptedCode)
   // URL untuk gambar OG Image
-  const ogImageUrl = `https://coupon.kedaimaster.com/coup/thumb/${couponCode}`;
-  const redirectTo = `https://kedaimaster.com/?modal=claim-coupon&couponCode=${couponCode}`;
+    const ogImageUrl = `https://dev.coupon.kedaimaster.com/coup/thumb?c=${couponCode}`;
+    const redirectTo = `https://dev.kedaimaster.com/?modal=claim-coupon&c=${couponCode}`;
 
   // Render HTML yang berbeda sesuai dengan couponCode
   res.send(`
       <html>
         <head>
-          <title>Kupon - ${couponCode}</title>
+          <title>Kupon - ${decryptedCode}</title>
           <!-- OG Meta Tags -->
-          <meta property="og:title" content="Kupon - ${couponCode}" />
+          <meta property="og:title" content="Kupon - ${decryptedCode}" />
           <meta property="og:description" content="Jangan ragukan pelanggan, klaim untuk berlangganan dan nikmati fitur spesial!" />
           <meta property="og:image" content="${ogImageUrl}" />
-          <meta property="og:url" content="https://coupon.kedaimaster.com/coup/thumb/?couponCode=${couponCode}" />
+          <meta property="og:url" content="https://dev.coupon.kedaimaster.com/coup/thumb?c=${couponCode}" />
           <meta name="twitter:card" content="summary_large_image" />
           <meta name="twitter:image" content="${ogImageUrl}" />
           <!-- Redirect Meta Tag -->
@@ -54,9 +64,20 @@ app.get("/coupon", async (req, res) => {
 
 
 // Endpoint to serve the thumbnail for a coupon image
-app.get("/coup/thumb/:couponCode", async (req, res) => {
-  const couponCode = req.params.couponCode;
-  const imagePath = path.join(imagesDir, `${couponCode}.png`);
+app.get("/coup/thumb", async (req, res) => {
+  const couponCode = req.query.c;
+  console.log("------"+couponCode)
+  
+    // Your AES-256 key (ensure this is kept secret and secure!)
+    const secretKey = 'xixixi666'; // 32 characters for AES-256
+
+    // Decrypt the couponCode
+    const decryptedBytes = CryptoJS.AES.decrypt(couponCode, secretKey);
+    console.log(decryptedBytes)
+    const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
+  console.log("aaaa"+decryptedCode)
+
+  const imagePath = path.join(imagesDir, `${decryptedCode}.png`);
   const defaultImagePath = path.join(imagesDir, '404coupon.png'); // Default image path
 
   // Check if the coupon image exists
@@ -113,9 +134,9 @@ async function generateCouponImage(couponCode, discountType, discountValue, expi
 
   const period = discountValue === 0 ? `Masa berlangganan ${discountPeriods} minggu` : `Masa kupon ${discountPeriods} minggu`;
 
-  const daysLeft = expirationDate != 'undefined' ? calculateDaysLeft(expirationDate) : null;
+  const daysLeft = (expirationDate != 'undefined' && expirationDate != null) ? calculateDaysLeft(expirationDate) : null;
 
-  const expiration = expirationDate == 'undefined' ? 'Tanpa kadaluarsa' :
+  const expiration = (expirationDate == 'undefined' || expirationDate == null) ? 'Tanpa kadaluarsa' :
     daysLeft <= 7
       ? `Berlaku hingga ${daysLeft} hari lagi`
       : `Berlaku hingga: ${formatExpirationDate(expirationDate)}`
