@@ -22,23 +22,25 @@ const corsOptions = {
 app.use(cors(corsOptions)); // Enable CORS with the defined options
 
 app.get("/coupon", async (req, res) => {
-    const couponCode = req.query.c;
+  const couponCode = req.query.c;
   if (!couponCode) {
     return res.status(400).send("Coupon code is required");
   }
+  const decodedCouponCode = decodeURIComponent(couponCode);
+  console.log("Decoded coupon code:", decodedCouponCode);
 
-    console.log(couponCode)
-    // Your AES-256 key (ensure this is kept secret and secure!)
-    const secretKey = 'xixixi666'; // 32 characters for AES-256
+  console.log("cc" + decodedCouponCode)
+  // Your AES-256 key (ensure this is kept secret and secure!)
+  const secretKey = 'xixixi666'; // 32 characters for AES-256
 
-    // Decrypt the couponCode
-    const decryptedBytes = CryptoJS.AES.decrypt(couponCode, secretKey);
-    const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
+  // Decrypt the couponCode
+  const decryptedBytes = CryptoJS.AES.decrypt(decodedCouponCode, secretKey);
+  const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
 
-    console.log(decryptedCode)
+  console.log(decryptedCode)
   // URL untuk gambar OG Image
-    const ogImageUrl = `https://dev.coupon.kedaimaster.com/coup/thumb?c=${couponCode}`;
-    const redirectTo = `https://dev.kedaimaster.com/?modal=claim-coupon&c=${couponCode}`;
+  const ogImageUrl = `https://dev.coupon.kedaimaster.com/coup/thumb?c=${couponCode}`;
+  const redirectTo = `https://dev.kedaimaster.com/?modal=claim-coupon&c=${couponCode}`;
 
   // Render HTML yang berbeda sesuai dengan couponCode
   res.send(`
@@ -65,17 +67,20 @@ app.get("/coupon", async (req, res) => {
 
 // Endpoint to serve the thumbnail for a coupon image
 app.get("/coup/thumb", async (req, res) => {
-  const couponCode = req.query.c;
-  console.log("------"+couponCode)
-  
-    // Your AES-256 key (ensure this is kept secret and secure!)
-    const secretKey = 'xixixi666'; // 32 characters for AES-256
+  let couponCode = req.query.c;
+  console.log("------cc" + couponCode)
 
-    // Decrypt the couponCode
-    const decryptedBytes = CryptoJS.AES.decrypt(couponCode, secretKey);
-    console.log(decryptedBytes)
-    const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
-  console.log("aaaa"+decryptedCode)
+  // Your AES-256 key (ensure thi
+  couponCode = decodeURIComponent(couponCode);
+
+  console.log("------cc" + couponCode)
+  const secretKey = 'xixixi666'; // 32 characters for AES-256
+
+  // Decrypt the couponCode
+  const decryptedBytes = CryptoJS.AES.decrypt(couponCode, secretKey);
+  console.log(decryptedBytes)
+  const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
+  console.log("dc" + decryptedCode)
 
   const imagePath = path.join(imagesDir, `${decryptedCode}.png`);
   const defaultImagePath = path.join(imagesDir, '404coupon.png'); // Default image path
