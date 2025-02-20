@@ -21,29 +21,41 @@ const corsOptions = {
 
 app.use(cors(corsOptions)); // Enable CORS with the defined options
 
+
 app.get("/coupon", async (req, res) => {
-  const couponCode = req.query.c;
+  let couponCode = req.query.c;
   if (!couponCode) {
     return res.status(400).send("Coupon code is required");
   }
-  const decodedCouponCode = decodeURIComponent(couponCode);
-  console.log("Decoded coupon code:", decodedCouponCode);
 
-  console.log("cc" + decodedCouponCode)
-  // Your AES-256 key (ensure this is kept secret and secure!)
-  const secretKey = 'xixixi666'; // 32 characters for AES-256
+  try {
+    // Decode the URL-encoded coupon code
+    console.log("hoho"+couponCode)
+    let decodedCouponCode = couponCode;
+    decodedCouponCode = decodedCouponCode.replace('LDNWAlASJDNdaw','+').replace('XCLZBKlaWDJ','/').replace('LDSsadANJlas','=');
 
-  // Decrypt the couponCode
-  const decryptedBytes = CryptoJS.AES.decrypt(decodedCouponCode, secretKey);
-  const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
+    console.log("Decoded coupon ccode:", decodedCouponCode);
 
-  console.log(decryptedCode)
-  // URL untuk gambar OG Image
-  const ogImageUrl = `https://dev.coupon.kedaimaster.com/coup/thumb?c=${couponCode}`;
-  const redirectTo = `https://dev.kedaimaster.com/?modal=claim-coupon&c=${couponCode}`;
+    // Your AES-256 key (ensure this is kept secret and secure!)
+    const secretKey = 'xixixi666'; // 32 characters for AES-256
 
-  // Render HTML yang berbeda sesuai dengan couponCode
-  res.send(`
+    // Decrypt the coupon code
+    const decryptedBytes = CryptoJS.AES.decrypt(decodedCouponCode, secretKey);
+    const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
+
+    if (!decryptedCode) {
+      console.log('error')
+      return res.status(400).send("Invalid coupon code");
+    }
+
+    console.log("Decrypted Coupon Code:", decryptedCode);
+
+    // URL untuk gambar OG Image
+    const ogImageUrl = `https://dev.coupon.kedaimaster.com/coup/thumb?c=${couponCode}`;
+    const redirectTo = `https://dev.kedaimaster.com/?modal=claim-coupon&c=${encodeURIComponent(couponCode)}`;
+
+    // Render HTML yang berbeda sesuai dengan couponCode
+    res.send(`
       <html>
         <head>
           <title>Kupon - ${decryptedCode}</title>
@@ -62,44 +74,73 @@ app.get("/coupon", async (req, res) => {
         </body>
       </html>
     `);
+  } catch (error) {
+    console.error("Error during coupon code decryption:", error);
+    res.status(500).send("An error occurred while processing the coupon code");
+  }
+});
+
+// Start the Express server
+app.listen(3000, () => {
+  console.log("Server is running on port 3000");
 });
 
 
 // Endpoint to serve the thumbnail for a coupon image
 app.get("/coup/thumb", async (req, res) => {
   let couponCode = req.query.c;
-  console.log("------cc" + couponCode)
-
-  // Your AES-256 key (ensure thi
-  couponCode = decodeURIComponent(couponCode);
-
-  console.log("------cc" + couponCode)
-  const secretKey = 'xixixi666'; // 32 characters for AES-256
-
-  // Decrypt the couponCode
-  const decryptedBytes = CryptoJS.AES.decrypt(couponCode, secretKey);
-  console.log(decryptedBytes)
-  const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
-  console.log("dc" + decryptedCode)
-
-  const imagePath = path.join(imagesDir, `${decryptedCode}.png`);
-  const defaultImagePath = path.join(imagesDir, '404coupon.png'); // Default image path
-
-  // Check if the coupon image exists
-  if (!fs.existsSync(imagePath)) {
-    console.log('Coupon image not found, serving default 404coupon.png...');
-
-    // Check if the 404coupon.png exists
-    if (!fs.existsSync(defaultImagePath)) {
-      return res.status(404).send('404coupon.png not found.');
-    }
-
-    // Serve the default 404coupon.png image
-    return res.sendFile(defaultImagePath);
+  couponCode = decodeURIComponent(couponCode)
+  console.log(couponCode)
+  couponCode = couponCode.replace('LDNWAlASJDNdaw','+').replace('XCLZBKlaWDJ','/').replace('LDSsadANJlas','=');
+  console.log("hehe"+couponCode)
+  if (!couponCode) {
+    return res.status(400).send('Coupon code is required');
   }
 
-  // If the coupon image exists, serve it
-  return res.sendFile(imagePath);
+  console.log("Received coupon codee:", couponCode);
+
+  // Decode the URL-encoded coupon code
+  console.log("Decoded coupon codee:", couponCode);
+
+  // AES decryption key (ensure this is kept secret and secure!)
+  const secretKey = 'xixixi666'; // 32 characters for AES-256
+
+  try {
+    // Decrypt the coupon code
+    const decryptedBytes = CryptoJS.AES.decrypt(couponCode, secretKey);
+    const decryptedCode = decryptedBytes.toString(CryptoJS.enc.Utf8);
+
+    console.log("Decrypted coupon codee:", decryptedCode);
+
+    if (!decryptedCode) {
+      return res.status(400).send('Invalid or corrupted coupon code');
+    }
+
+    // Define image directory and paths
+    const imagesDir = path.join(__dirname, 'uploads/coupon');
+    const imagePath = path.join(imagesDir, `${decryptedCode}.png`);
+    const defaultImagePath = path.join(imagesDir, '404coupon.png'); // Default image path
+    console.log(imagePath)
+    // Check if the coupon image exists
+    if (!fs.existsSync(imagePath)) {
+      console.log('Coupon image not found, serving default 404coupon.png...');
+      
+      // If 404 image is not found, return a 404 error
+      if (!fs.existsSync(defaultImagePath)) {
+        return res.status(404).send('404coupon.png not found.');
+      }
+
+      // Serve the default 404coupon.png image
+      return res.sendFile(defaultImagePath);
+    }
+
+    // Serve the coupon image if it exists
+    return res.sendFile(imagePath);
+
+  } catch (error) {
+    console.error("Error during coupon code decryption:", error);
+    return res.status(500).send("An error occurred while processing the coupon code.");
+  }
 });
 
 const formatExpirationDate = (dateString) => {
